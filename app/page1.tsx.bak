@@ -1,0 +1,49 @@
+"use client"
+import { Button } from '@/components/ui/button';
+import Link from 'next/link'
+
+export default function Home() {
+    return (
+        // min-h-screenで画面全体の高さを確保しつつ、中央に寄せています
+        <div className='flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4'>
+
+            {/* タイトル部分 */}
+            <div className='flex flex-col items-center bg-white p-4 my-2 w-[90%] max-w-md rounded-lg shadow-sm'>
+                <h2 className="text-2xl font-bold text-gray-800">
+                    オセロ対戦
+                </h2>
+            </div>
+
+            {/* 人と対戦する */}
+            <div className='flex flex-col items-center bg-white p-4 my-2 w-[60%] max-w-md rounded-lg shadow-sm'>
+                <h3 className="text-lg font-bold mb-2">
+                    人と対戦する
+                </h3>
+                <Button variant="destructive" asChild className="w-full max-w-[200px]">
+                    <Link href="/match">二人で対戦</Link>
+                </Button>
+            </div>
+
+            {/* AIと対戦する */}
+            <div className='flex flex-col items-center bg-white p-4 my-2 w-[60%] max-w-md rounded-lg shadow-sm'>
+                <h3 className="text-lg font-bold mb-2">
+                    AIと対戦する
+                </h3>
+                <Button variant="destructive" asChild className="w-full max-w-[200px]">
+                    <Link href="/vsAI">AIと対戦</Link>
+                </Button>
+            </div>
+
+            {/* AI同士の対戦を見る */}
+            <div className='flex flex-col items-center bg-white p-4 my-2 w-[60%] max-w-md rounded-lg shadow-sm'>
+                <h3 className="text-lg font-bold mb-2">
+                    AI同士の対戦を見る
+                </h3>
+                <Button variant="destructive" asChild className="w-full max-w-[200px]">
+                    <Link href="/AIvsAI">AI vs AI</Link>
+                </Button>
+            </div>
+
+        </div>
+    );
+}

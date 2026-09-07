@@ -1,0 +1,197 @@
+"use client"
+import Board from '@/components/Board';
+import WinnerAnnouncePop from '@/components/WinnerAnnouncePop';
+import { Button } from '@/components/ui/button';
+import { getBestMoveWithEvaluation, isPlacedCorner, listCanPutCell, listCanPutPlayerPerAI, minOpponentPut } from '@/utils/AILogic';
+import { BoardState, checkPut, checkWinner, countPiece, initAI, initBoard, makeBoard, Player, Winner } from "@/utils/gameSetting";
+import { useEffect, useState } from 'react';
+
+export default function AIvsAI() {
+    const [board, setBoard] = useState<BoardState>(initBoard());
+    const [AI1, setAI1] = useState<Player>('black'); // Player型が文字列リテラル型
+    const [AI2, setAI2] = useState<Player>('white'); // Player型が文字列リテラル型
+    const [winner, setWinner] = useState<Winner>(null);
+    const [currentPlayer, setCurrentPlayer] = useState<'AI1' | 'AI2'>('AI1');
+    const [gameStatus, setGameStatus] = useState<'ready' | 'playing' | 'paused' | 'finished'>('ready');
+    const [ai1Algo, setAi1Algo] = useState<'mobility' | 'evaluation'>('evaluation');
+    const [ai2Algo, setAi2Algo] = useState<'mobility' | 'evaluation'>('mobility');
+
+    useEffect(() => {
+        if (gameStatus === 'playing' && !winner) {
+            const currentAI = currentPlayer === 'AI1' ? AI1 : AI2;
+            const opponent = currentPlayer === 'AI1' ? AI2 : AI1;
+            AIMove(currentAI, opponent);
+        }
+    }, [gameStatus, currentPlayer, winner]);
+
+    const AIMove = (AI: Player, opponent: Player) => {
+        if (checkPut(board, AI)) {
+            const canPutAI = listCanPutCell(board, AI);
+            const algo = currentPlayer === 'AI1' ? ai1Algo : ai2Algo;
+
+            let selectedMove: number = -1;
+
+            if (algo === 'evaluation') {
+                const countPieces = countPiece(board);
+                if (countPieces.countBlack + countPieces.countWhite <= 48) {
+                    selectedMove = getBestMoveWithEvaluation(board, AI);
+                } else {
+                    // 終盤は最大数取るようにする
+                    const AICounts = new Array(canPutAI.length);
+                    for (let i = 0; i < canPutAI.length; i++) {
+                        const putAIBoard = makeBoard(board, Math.trunc(canPutAI[i] % 8), Math.trunc(canPutAI[i] / 8), AI);
+                        if (putAIBoard) {
+                            const countPieces = countPiece(putAIBoard);
+                            AICounts[i] = AI === 'black' ? countPieces.countBlack : countPieces.countWhite;
+                        }
+                    }
+                    let maxAICount = AICounts[0];
+                    for (let i = 1; i < AICounts.length; i++) {
+                        if (AICounts[i] > maxAICount) {
+                            maxAICount = AICounts[i];
+                        }
+                    }
+                    const maxAIPut = new Array();
+                    for (let i = 0; i < canPutAI.length; i++) {
+                        if (maxAICount === AICounts[i]) {
+                            maxAIPut.push(canPutAI[i]);
+                        }
+                    }
+                    selectedMove = maxAIPut[Math.trunc(Math.random() * maxAIPut.length)];
+                }
+            } else {
+                // 従来のモビリティ最小化AI
+                const canPutOpponentPerAI = listCanPutPlayerPerAI(board, canPutAI, AI);
+                const countPieces = countPiece(board);
+
+                if (countPieces.countBlack + countPieces.countWhite <= 48) {
+                    if (!isPlacedCorner(canPutOpponentPerAI)) {
+                        const cornerAIPut = canPutAI.filter(move => [0, 7, 56, 63].includes(move));
+                        if (cornerAIPut.length > 0) {
+                            selectedMove = cornerAIPut[Math.floor(Math.random() * cornerAIPut.length)];
+                        } else {
+                            const safeMoves = canPutAI.filter(move => ![9, 14, 49, 54].includes(move));
+                            const minOpponentMoves = minOpponentPut(
+                                safeMoves.map(move => listCanPutCell(makeBoard(board, move % 8, Math.floor(move / 8), AI) as BoardState, opponent)),
+                                safeMoves
+                            );
+                            selectedMove = minOpponentMoves[Math.floor(Math.random() * minOpponentMoves.length)];
+                        }
+                    } else {
+                        const minOpponentMoves = minOpponentPut(canPutOpponentPerAI, canPutAI);
+                        selectedMove = minOpponentMoves[Math.floor(Math.random() * minOpponentMoves.length)];
+                    }
+                } else {
+                    const movesWithCounts = canPutAI.map(move => {
+                        const newBoard = makeBoard(board, move % 8, Math.floor(move / 8), AI);
+                        return {
+                            move,
+                            count: newBoard ? countPiece(newBoard)[AI === 'black' ? 'countBlack' : 'countWhite'] : 0
+                        };
+                    });
+                    const maxCount = Math.max(...movesWithCounts.map(m => m.count));
+                    const bestMoves = movesWithCounts.filter(m => m.count === maxCount).map(m => m.move);
+                    selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+                }
+            }
+
+            if (selectedMove !== -1) {
+                const newBoard = makeBoard(board, selectedMove % 8, Math.floor(selectedMove / 8), AI);
+                if (newBoard) {
+                    setTimeout(() => {
+                        setBoard(newBoard);
+                        const newWinner = checkWinner(newBoard);
+                        if (newWinner) {
+                            setWinner(newWinner);
+                            setGameStatus('finished');
+                        } else {
+                            setCurrentPlayer(currentPlayer === 'AI1' ? 'AI2' : 'AI1');
+                        }
+                    }, 500);
+                }
+            }
+        } else {
+            setCurrentPlayer(currentPlayer === 'AI1' ? 'AI2' : 'AI1');
+        }
+    }
+
+    const startGame = () => {
+        setBoard(initBoard());
+        setAI1('black'); // プレイヤーは文字列リテラル型
+        setAI2('white'); // プレイヤーは文字列リテラル型
+        setWinner(null);
+        setCurrentPlayer('AI1');
+        setGameStatus('playing');
+    };
+
+    const pauseGame = () => setGameStatus('paused');
+    const resumeGame = () => setGameStatus('playing');
+
+    const handleWinnerDismiss = () => {
+        setGameStatus('ready');
+    };
+
+    return (
+        <div className='flex flex-col items-center'>
+            <h2 className='font-bold' style={{ fontSize: `25px` }}>AI1 vs AI2</h2>
+            <Board board={board} onCellClick={() => { }} />
+            {!winner && <p>{currentPlayer}のターン</p>}
+            {!winner && <p>黒：{countPiece(board).countBlack}　　白：{countPiece(board).countWhite}</p>}
+
+            {gameStatus === 'ready' && (
+                <div className='flex flex-col items-center gap-6 my-6 p-6 border rounded-xl bg-white shadow-sm w-80'>
+                    <div className='flex flex-col gap-4 w-full'>
+                        <div className='flex items-center justify-between'>
+                            <span className='font-bold text-gray-700 text-sm'>AI 1 (黒):</span>
+                            <div className='flex rounded-lg overflow-hidden border border-gray-200'>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 text-xs font-semibold transition-all ${ai1Algo === 'mobility' ? 'bg-red-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                    onClick={() => setAi1Algo('mobility')}
+                                >
+                                    従来(手数最小)
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 text-xs font-semibold transition-all ${ai1Algo === 'evaluation' ? 'bg-red-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                    onClick={() => setAi1Algo('evaluation')}
+                                >
+                                    評価テーブル
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className='flex items-center justify-between'>
+                            <span className='font-bold text-gray-700 text-sm'>AI 2 (白):</span>
+                            <div className='flex rounded-lg overflow-hidden border border-gray-200'>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 text-xs font-semibold transition-all ${ai2Algo === 'mobility' ? 'bg-red-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                    onClick={() => setAi2Algo('mobility')}
+                                >
+                                    従来(手数最小)
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`px-3 py-1.5 text-xs font-semibold transition-all ${ai2Algo === 'evaluation' ? 'bg-red-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                                    onClick={() => setAi2Algo('evaluation')}
+                                >
+                                    評価テーブル
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <Button onClick={startGame} className="w-full">ゲーム開始</Button>
+                </div>
+            )}
+            {gameStatus === 'playing' && (
+                <Button onClick={pauseGame}>一時停止</Button>
+            )}
+            {gameStatus === 'paused' && (
+                <Button onClick={resumeGame}>再開</Button>
+            )}
+
+            {winner && <WinnerAnnouncePop winner={winner} onDismiss={handleWinnerDismiss} />}
+        </div>
+    );
+}
