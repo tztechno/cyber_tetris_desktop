@@ -59,4 +59,5 @@ jobs:
             src-tauri/target/release/cyber_tetris.exe
             src-tauri/target/release/Cyber Tetris.exe
           if-no-files-found: warn
+          retention-days: 1
 
